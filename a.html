@@ -23,10 +23,7 @@ body { font-family: Arial; text-align:center; padding:20px; }
   font-size:20px;
 }
 
-.marked {
-  background:black;
-  color:white;
-}
+.marked { background:black; color:white; }
 
 input, button { font-size:18px; padding:8px; margin:5px; }
 #turn { font-weight:bold; font-size:20px; }
@@ -36,74 +33,89 @@ input, button { font-size:18px; padding:8px; margin:5px; }
 <body>
 
 <h2>🎯 Player A</h2>
-<div id="turn">Loading...</div>
+<div id="turn"></div>
 
 <div class="grid" id="board"></div>
 
 <input id="num" type="number" min="1" max="25" placeholder="1-25">
 <button onclick="call()">Call</button>
+<button onclick="resetGame()">Reset</button>
 
 <h3>Numbers Called:</h3>
 <div id="log"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, push, set, onValue, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, push, set, remove, get, onValue, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
   authDomain: "bingo-sgthegreat.firebaseapp.com",
   databaseURL: "https://bingo-sgthegreat-default-rtdb.firebaseio.com",
-  projectId: "bingo-sgthegreat",
-  storageBucket: "bingo-sgthegreat.firebasestorage.app",
-  messagingSenderId: "585612677716",
-  appId: "1:585612677716:web:e86d20262ecbdef5e4d3c1"
+  projectId: "bingo-sgthegreat"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const turnRef = ref(db, "turn");
-const callsRef = ref(db, "calls");
+const turnRef = ref(db,"turn");
+const callsRef = ref(db,"calls");
+const calledRef = ref(db,"calledNumbers");
 
-set(turnRef, "A");
+set(turnRef,"A");
 
-let currentTurn = "";
+let currentTurn="";
+let calledCache={};
 
-// ===== generate random board =====
-let nums = Array.from({length:25}, (_,i)=>i+1)
-  .sort(()=>Math.random()-0.5);
-
-const board = document.getElementById("board");
+// generate board
+let nums=Array.from({length:25},(_,i)=>i+1).sort(()=>Math.random()-0.5);
 nums.forEach(n=>{
-  let d = document.createElement("div");
+  let d=document.createElement("div");
   d.className="cell";
   d.id="c"+n;
   d.innerText=n;
   board.appendChild(d);
 });
 
-// ===== turn watcher =====
-onValue(turnRef, snap=>{
-  currentTurn = snap.val();
-  document.getElementById("turn").innerText =
-    currentTurn==="A" ? "✅ Your Turn" : "⏳ Player B Turn";
+// watch called numbers
+onValue(calledRef,snap=>{
+  calledCache=snap.val()||{};
 });
 
-// ===== call number =====
-window.call=function(){
-  if(currentTurn!=="A") return alert("Wait for your turn!");
-  let n=document.getElementById("num").value;
+// turn watcher
+onValue(turnRef,snap=>{
+  currentTurn=snap.val();
+  turn.innerText=currentTurn==="A"?"✅ Your Turn":"⏳ Player B Turn";
+});
+
+// call number
+window.call=async function(){
+  if(currentTurn!=="A") return alert("Wait your turn");
+  let n=num.value;
   if(!n) return;
+
+  if(calledCache[n]) return alert("Already called!");
+
+  await set(ref(db,"calledNumbers/"+n),true);
   push(callsRef,n);
   set(turnRef,"B");
-  document.getElementById("num").value="";
-}
+  num.value="";
+};
 
-// ===== sync marking =====
-onChildAdded(callsRef, snap=>{
+// reset
+window.resetGame=function(){
+  if(!confirm("Reset game?")) return;
+  remove(callsRef);
+  remove(calledRef);
+  set(turnRef,"A");
+  log.innerText="";
+  document.querySelectorAll(".cell").forEach(c=>c.classList.remove("marked"));
+};
+
+// sync marks
+onChildAdded(callsRef,snap=>{
   let n=snap.val();
-  document.getElementById("log").innerText += " "+n;
+  log.innerText+=" "+n;
   let cell=document.getElementById("c"+n);
   if(cell) cell.classList.add("marked");
 });
