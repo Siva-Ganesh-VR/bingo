@@ -3,41 +3,29 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Player B</title>
-
 <style>
+/* same styles as A */
 body { font-family: Arial; text-align:center; padding:20px; }
-
-.grid {
-  display:grid;
-  grid-template-columns: repeat(5, 60px);
-  gap:5px;
-  justify-content:center;
-  margin:20px auto;
-}
-
-.cell {
-  width:60px;
-  height:60px;
-  line-height:60px;
-  border:1px solid #000;
-  font-size:20px;
-}
-
+.grid { display:grid; grid-template-columns:repeat(5,60px); gap:5px; justify-content:center; margin:20px auto; }
+.cell { width:60px; height:60px; line-height:60px; border:1px solid #000; font-size:20px; }
 .marked { background:black; color:white; }
-
-input, button { font-size:18px; padding:8px; margin:5px; }
-#turn { font-weight:bold; font-size:20px; }
+#winner { font-size:24px; color:red; font-weight:bold; margin-top:15px; }
+.fireworks { position:fixed; inset:0; pointer-events:none; background:radial-gradient(circle,#fff 2px,transparent 3px); animation:boom 1s infinite; opacity:.6; display:none;}
+@keyframes boom { from{transform:scale(0);} to{transform:scale(4);opacity:0;} }
 </style>
 </head>
 
 <body>
 
+<div class="fireworks" id="fx"></div>
+
 <h2>🎯 Player B</h2>
 <div id="turn"></div>
+<div id="winner"></div>
 
 <div class="grid" id="board"></div>
 
-<input id="num" type="number" min="1" max="25" placeholder="1-25">
+<input id="num" type="number" min="1" max="25">
 <button onclick="call()">Call</button>
 <button onclick="resetGame()">Reset</button>
 
@@ -48,74 +36,84 @@ input, button { font-size:18px; padding:8px; margin:5px; }
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, push, set, remove, onValue, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
-  authDomain: "bingo-sgthegreat.firebaseapp.com",
-  databaseURL: "https://bingo-sgthegreat-default-rtdb.firebaseio.com",
-  projectId: "bingo-sgthegreat"
+const config={
+ apiKey:"AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
+ authDomain:"bingo-sgthegreat.firebaseapp.com",
+ databaseURL:"https://bingo-sgthegreat-default-rtdb.firebaseio.com",
+ projectId:"bingo-sgthegreat"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const app=initializeApp(config);
+const db=getDatabase(app);
 
-const turnRef = ref(db,"turn");
-const callsRef = ref(db,"calls");
-const calledRef = ref(db,"calledNumbers");
+const turnRef=ref(db,"turn");
+const callsRef=ref(db,"calls");
+const calledRef=ref(db,"called");
+const winRef=ref(db,"winner");
 
-let currentTurn="";
-let calledCache={};
+let called={}, myNums=[], gameOver=false;
 
-// generate board
-let nums=Array.from({length:25},(_,i)=>i+1).sort(()=>Math.random()-0.5);
-nums.forEach(n=>{
-  let d=document.createElement("div");
-  d.className="cell";
-  d.id="c"+n;
-  d.innerText=n;
-  board.appendChild(d);
+myNums=Array.from({length:25},(_,i)=>i+1).sort(()=>Math.random()-0.5);
+myNums.forEach(n=>{
+ let d=document.createElement("div");
+ d.className="cell";
+ d.id="c"+n;
+ d.innerText=n;
+ board.appendChild(d);
 });
 
-// watch called numbers
-onValue(calledRef,snap=>{
-  calledCache=snap.val()||{};
+onValue(calledRef,s=>called=s.val()||{});
+onValue(turnRef,s=>turn.innerText=s.val()==="B"?"✅ Your Turn":"⏳ Player A Turn");
+
+onValue(winRef,s=>{
+ if(!s.exists()) return;
+ gameOver=true;
+ fx.style.display="block";
+ winner.innerText = s.val()==="B"
+  ? "SG blessed you to win the match"
+  : "🎉 Player A Wins!";
 });
 
-// turn watcher
-onValue(turnRef,snap=>{
-  currentTurn=snap.val();
-  turn.innerText=currentTurn==="B"?"✅ Your Turn":"⏳ Player A Turn";
-});
+function countLines(){
+ let grid=myNums.map(n=>called[n]?1:0);
+ let lines=0;
+ for(let r=0;r<5;r++) if(grid.slice(r*5,r*5+5).every(x=>x)) lines++;
+ for(let c=0;c<5;c++){ let ok=true; for(let r=0;r<5;r++) if(!grid[r*5+c]) ok=false; if(ok) lines++; }
+ if([0,6,12,18,24].every(i=>grid[i])) lines++;
+ if([4,8,12,16,20].every(i=>grid[i])) lines++;
+ return lines;
+}
 
-// call number
 window.call=async function(){
-  if(currentTurn!=="B") return alert("Wait your turn");
-  let n=num.value;
-  if(!n) return;
+ if(gameOver) return;
+ let turnNow; onValue(turnRef,s=>turnNow=s.val(),{onlyOnce:true});
+ if(turnNow!=="B") return alert("Wait turn");
 
-  if(calledCache[n]) return alert("Already called!");
+ let n=num.value;
+ if(!n || called[n]) return alert("Invalid");
 
-  await set(ref(db,"calledNumbers/"+n),true);
-  push(callsRef,n);
-  set(turnRef,"A");
-  num.value="";
+ await set(ref(db,"called/"+n),true);
+ push(callsRef,n);
+ set(turnRef,"A");
+
+ if(countLines()>=5) set(winRef,"B");
+
+ num.value="";
 };
 
-// reset
 window.resetGame=function(){
-  if(!confirm("Reset game?")) return;
-  remove(callsRef);
-  remove(calledRef);
-  set(turnRef,"A");
-  log.innerText="";
-  document.querySelectorAll(".cell").forEach(c=>c.classList.remove("marked"));
+ remove(callsRef);
+ remove(calledRef);
+ remove(winRef);
+ set(turnRef,"A");
+ location.reload();
 };
 
-// sync marks
-onChildAdded(callsRef,snap=>{
-  let n=snap.val();
-  log.innerText+=" "+n;
-  let cell=document.getElementById("c"+n);
-  if(cell) cell.classList.add("marked");
+onChildAdded(callsRef,s=>{
+ let n=s.val();
+ log.innerText+=" "+n;
+ let c=document.getElementById("c"+n);
+ if(c) c.classList.add("marked");
 });
 </script>
 
