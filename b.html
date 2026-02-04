@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bingo - Player B</title>
+<link rel="manifest" href="manifest.json">
+
+<style>
+body { font-family: Arial; text-align:center; padding:20px; }
+#log { margin-top:20px; font-size:22px; word-wrap:break-word; }
+</style>
+</head>
+
+<body>
+
+<h2>🎯 Player B</h2>
+
+<h3>Numbers Called:</h3>
+<div id="log"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+
+  apiKey: "AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
+
+  authDomain: "bingo-sgthegreat.firebaseapp.com",
+
+  databaseURL: "https://bingo-sgthegreat-default-rtdb.firebaseio.com",
+
+  projectId: "bingo-sgthegreat",
+
+  storageBucket: "bingo-sgthegreat.firebasestorage.app",
+
+  messagingSenderId: "585612677716",
+
+  appId: "1:585612677716:web:e86d20262ecbdef5e4d3c1",
+
+  measurementId: "G-ZSH9785HVL"
+
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+onChildAdded(ref(db,"calls"), snap=>{
+  document.getElementById("log").innerText += " " + snap.val();
+});
+</script>
+
+</body>
+</html>
