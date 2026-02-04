@@ -7,45 +7,67 @@
 
 <style>
 body { font-family: Arial; text-align:center; padding:20px; }
+input, button { font-size:20px; padding:10px; margin:5px; width:120px; }
 #log { margin-top:20px; font-size:22px; word-wrap:break-word; }
+#turn { font-size:22px; font-weight:bold; margin-top:10px; }
 </style>
 </head>
 
 <body>
 
 <h2>🎯 Player B</h2>
+<div id="turn">Loading...</div>
+
+<input id="num" type="number" min="1" max="25" placeholder="1-25">
+<button onclick="call()">Call</button>
 
 <h3>Numbers Called:</h3>
 <div id="log"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, push, set, onValue, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
-
   apiKey: "AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
-
   authDomain: "bingo-sgthegreat.firebaseapp.com",
-
   databaseURL: "https://bingo-sgthegreat-default-rtdb.firebaseio.com",
-
   projectId: "bingo-sgthegreat",
-
   storageBucket: "bingo-sgthegreat.firebasestorage.app",
-
   messagingSenderId: "585612677716",
-
   appId: "1:585612677716:web:e86d20262ecbdef5e4d3c1",
-
   measurementId: "G-ZSH9785HVL"
-
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-onChildAdded(ref(db,"calls"), snap=>{
+const turnRef = ref(db, "turn");
+const callsRef = ref(db, "calls");
+
+let currentTurn = "";
+
+onValue(turnRef, snap => {
+  currentTurn = snap.val();
+  document.getElementById("turn").innerText =
+    currentTurn === "B" ? "✅ Your Turn" : "⏳ Player A Turn";
+});
+
+window.call = function(){
+  if(currentTurn !== "B") {
+    alert("Wait for your turn!");
+    return;
+  }
+
+  let n = document.getElementById("num").value;
+  if(!n) return;
+
+  push(callsRef, n);
+  set(turnRef, "A");
+  document.getElementById("num").value="";
+}
+
+onChildAdded(callsRef, snap=>{
   document.getElementById("log").innerText += " " + snap.val();
 });
 </script>
