@@ -3,41 +3,17 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Player B</title>
-
 <style>
-body { font-family: Arial; text-align:center; padding:20px; }
-
-.grid{
- display:grid;
- grid-template-columns:repeat(5,60px);
- gap:5px;
- justify-content:center;
- margin:20px auto;
-}
-
-.cell{
- width:60px;height:60px;line-height:60px;
- border:1px solid #000;font-size:20px;
-}
-
-.A{background:#1e90ff;color:white;} /* blue */
-.B{background:#2ecc71;color:white;} /* green */
-.win{outline:4px solid yellow;}
-
-#bingo{font-size:32px;font-weight:bold;letter-spacing:8px;}
-#winner{font-size:22px;color:red;margin:10px;}
-
-.fire{
- position:fixed;inset:0;
- background:radial-gradient(circle,#fff 2px,transparent 3px);
- animation:boom 1s infinite;
- opacity:.6;display:none;pointer-events:none;
-}
-
-@keyframes boom{
- from{transform:scale(0);}
- to{transform:scale(4);opacity:0;}
-}
+body{font-family:Arial;text-align:center;padding:20px}
+.grid{display:grid;grid-template-columns:repeat(5,60px);gap:5px;justify-content:center}
+.cell{width:60px;height:60px;line-height:60px;border:1px solid #000;font-size:20px}
+.A{background:#1e90ff;color:white}
+.B{background:#2ecc71;color:white}
+.win{outline:4px solid yellow}
+#bingo{font-size:30px;font-weight:bold;letter-spacing:8px}
+.fire{position:fixed;inset:0;background:radial-gradient(circle,#fff 2px,transparent 3px);
+animation:boom 1s infinite;opacity:.6;display:none}
+@keyframes boom{from{transform:scale(0)}to{transform:scale(4);opacity:0}}
 </style>
 </head>
 
@@ -60,8 +36,8 @@ body { font-family: Arial; text-align:center; padding:20px; }
 <div id="log"></div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, push, set, remove, onValue, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getDatabase,ref,push,set,remove,onValue,onChildAdded} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const config={
  apiKey:"AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
@@ -77,10 +53,11 @@ const turnRef=ref(db,"turn");
 const callsRef=ref(db,"calls");
 const winRef=ref(db,"winner");
 
-let calledBy={}, myNums=[], gameOver=false;
+let called={}, nums=[], over=false;
 
-myNums=Array.from({length:25},(_,i)=>i+1).sort(()=>Math.random()-0.5);
-myNums.forEach(n=>{
+nums=Array.from({length:25},(_,i)=>i+1).sort(()=>Math.random()-0.5);
+
+nums.forEach(n=>{
  let d=document.createElement("div");
  d.className="cell";
  d.id="c"+n;
@@ -88,56 +65,59 @@ myNums.forEach(n=>{
  board.appendChild(d);
 });
 
-onValue(turnRef,s=>turn.innerText=s.val()==="B"?"✅ Your Turn":"⏳ Player A Turn");
+onValue(turnRef,s=>{
+ turn.innerText=s.val()==="B"?"✅ Your Turn":"⏳ Player A Turn";
+});
 
 onValue(winRef,s=>{
  if(!s.exists()) return;
- gameOver=true;
+ over=true;
  fx.style.display="block";
  winner.innerText=s.val()==="B"
   ?"🎉 SG blessed you to win the match"
-  :"You never win sg";
+  :"you never win sg";
 });
 
-function checkLines(){
- let g=myNums.map(n=>calledBy[n]?1:0);
+function check(){
+ let g=nums.map(n=>called[n]?1:0);
  let lines=0;
  document.querySelectorAll(".cell").forEach(c=>c.classList.remove("win"));
 
- const wins=[];
- for(let r=0;r<5;r++){
-  let idx=[r*5,r*5+1,r*5+2,r*5+3,r*5+4];
-  if(idx.every(i=>g[i])){lines++;wins.push(idx);}
- }
- for(let c=0;c<5;c++){
-  let idx=[c,c+5,c+10,c+15,c+20];
-  if(idx.every(i=>g[i])){lines++;wins.push(idx);}
- }
- let d1=[0,6,12,18,24], d2=[4,8,12,16,20];
- if(d1.every(i=>g[i])){lines++;wins.push(d1);}
- if(d2.every(i=>g[i])){lines++;wins.push(d2);}
+ const mark=(arr)=>arr.forEach(i=>{
+  document.getElementById("c"+nums[i]).classList.add("win");
+ });
 
- wins.flat().forEach(i=>{
-  let n=myNums[i];
-  document.getElementById("c"+n)?.classList.add("win");
+ const rows=[
+ [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],
+ [15,16,17,18,19],[20,21,22,23,24],
+ [0,5,10,15,20],[1,6,11,16,21],
+ [2,7,12,17,22],[3,8,13,18,23],
+ [4,9,14,19,24],
+ [0,6,12,18,24],[4,8,12,16,20]
+ ];
+
+ rows.forEach(r=>{
+  if(r.every(i=>g[i])){
+   lines++; mark(r);
+  }
  });
 
  bingo.innerText="BINGO".slice(0,lines);
  return lines;
 }
 
-window.call=async function(){
- if(gameOver) return;
- let turnNow;
- onValue(turnRef,s=>turnNow=s.val(),{onlyOnce:true});
- if(turnNow!=="B") return alert("Wait turn");
+window.call=function(){
+ if(over) return;
+ onValue(turnRef,s=>{
+  if(s.val()!=="B") return alert("Wait turn");
 
- let n=num.value;
- if(!n||calledBy[n]) return alert("Invalid");
+  let n=num.value;
+  if(!n||called[n]) return alert("Invalid");
 
- push(callsRef,{num:n,by:"B"});
- set(turnRef,"A");
- num.value="";
+  push(callsRef,{num:n,by:"B"});
+  set(turnRef,"A");
+  num.value="";
+ },{onlyOnce:true});
 };
 
 window.resetGame=function(){
@@ -148,15 +128,12 @@ window.resetGame=function(){
 };
 
 onChildAdded(callsRef,s=>{
- if(gameOver) return;
-
+ if(over) return;
  let {num,by}=s.val();
- calledBy[num]=by;
-
+ called[num]=1;
  log.innerText+=" "+num;
  document.getElementById("c"+num)?.classList.add(by);
-
- if(checkLines()>=5) set(winRef,"B");
+ if(check()>=5) set(winRef,"B");
 });
 </script>
 
