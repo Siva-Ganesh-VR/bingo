@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bingo - A</title>
+<title>Bingo A</title>
 <style>
 body{font-family:Arial;text-align:center}
 .grid{display:grid;grid-template-columns:repeat(5,60px);gap:5px;justify-content:center}
@@ -28,6 +28,8 @@ body{font-family:Arial;text-align:center}
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getDatabase,ref,push,set,onValue,onChildAdded} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
+const ROOM="room1"; // change if new match
+
 const config={
  apiKey:"AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
  databaseURL:"https://bingo-sgthegreat-default-rtdb.firebaseio.com",
@@ -37,8 +39,9 @@ const config={
 const app=initializeApp(config);
 const db=getDatabase(app);
 
-const turnRef=ref(db,"turn");
-const callsRef=ref(db,"calls");
+const base="rooms/"+ROOM+"/";
+const turnRef=ref(db,base+"turn");
+const callsRef=ref(db,base+"calls");
 
 let called={};
 
@@ -58,7 +61,7 @@ onValue(turnRef,s=>{
 
 window.call=function(){
  onValue(turnRef,s=>{
-  if(s.val()!=="A") return alert("Wait your turn");
+  if(s.val()!=="A") return alert("Wait turn");
 
   let n=num.value;
   if(!n||called[n]) return alert("Invalid");
