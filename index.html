@@ -1,123 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>2 Player Bingo</title>
-  <style>
-    body { font-family: Arial; text-align: center; }
-    table { border-collapse: collapse; margin: 10px auto; }
-    td {
-      width: 45px; height: 45px;
-      border: 1px solid #333;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    .marked { background: #4CAF50; color: white; }
-    button { padding: 10px 20px; margin: 10px; }
-  </style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bingo Lobby</title>
+<style>
+body{font-family:Arial;text-align:center;padding:20px}
+input,button{font-size:18px;padding:8px;margin:5px}
+</style>
 </head>
 
 <body>
 
-<h2>🎯 2 Player Bingo</h2>
+<h2>🎯 Bingo Lobby</h2>
 
-<h3 id="turn">Player A Turn</h3>
+<input id="name" placeholder="Your name"><br>
+<input id="room" placeholder="Room code (e.g. AB12)"><br>
 
-<div style="display:flex; justify-content:center; gap:50px;">
-  <div>
-    <h3>Player A</h3>
-    <table id="boardA"></table>
-  </div>
-
-  <div>
-    <h3>Player B</h3>
-    <table id="boardB"></table>
-  </div>
-</div>
-
-<input type="number" id="callNumber" min="1" max="25" placeholder="Call number">
-<button onclick="call()">Call</button>
-
-<h3 id="result"></h3>
+<button onclick="join('A')">Join as Player A</button>
+<button onclick="join('B')">Join as Player B</button>
 
 <script>
-let used = new Set();
-let turn = "A";
+function join(role){
+ let name=document.getElementById("name").value;
+ let room=document.getElementById("room").value;
 
-function randomGrid() {
-  let nums = Array.from({length:25}, (_,i)=>i+1)
-    .sort(()=>Math.random()-0.5);
-  return nums;
-}
+ if(!name||!room) return alert("Enter name + room");
 
-function createBoard(id, nums) {
-  let table = document.getElementById(id);
-  table.innerHTML = "";
-  for (let i=0;i<5;i++){
-    let row = table.insertRow();
-    for (let j=0;j<5;j++){
-      let cell = row.insertCell();
-      cell.textContent = nums[i*5+j];
-    }
-  }
-}
-
-let boardA = randomGrid();
-let boardB = randomGrid();
-
-createBoard("boardA", boardA);
-createBoard("boardB", boardB);
-
-function mark(boardId, number){
-  let cells = document.getElementById(boardId).getElementsByTagName("td");
-  for (let cell of cells){
-    if (parseInt(cell.textContent) === number){
-      cell.classList.add("marked");
-    }
-  }
-}
-
-function checkWin(boardId){
-  let cells = document.getElementById(boardId).getElementsByTagName("td");
-  let grid = [];
-  for (let i=0;i<25;i++){
-    grid.push(cells[i].classList.contains("marked"));
-  }
-
-  let lines = 0;
-
-  for (let i=0;i<5;i++){
-    if (grid.slice(i*5,i*5+5).every(v=>v)) lines++;
-    if ([0,1,2,3,4].map(j=>grid[j*5+i]).every(v=>v)) lines++;
-  }
-
-  if ([0,6,12,18,24].map(i=>grid[i]).every(v=>v)) lines++;
-  if ([4,8,12,16,20].map(i=>grid[i]).every(v=>v)) lines++;
-
-  return lines >= 5;
-}
-
-function call(){
-  let num = parseInt(document.getElementById("callNumber").value);
-  if (!num || num<1 || num>25) return alert("Enter 1–25");
-  if (used.has(num)) return alert("Number already used");
-
-  used.add(num);
-
-  mark("boardA", num);
-  mark("boardB", num);
-
-  if (checkWin("boardA")) {
-    document.getElementById("result").innerText = "🏆 Player A Wins!";
-    return;
-  }
-  if (checkWin("boardB")) {
-    document.getElementById("result").innerText = "🏆 Player B Wins!";
-    return;
-  }
-
-  turn = turn === "A" ? "B" : "A";
-  document.getElementById("turn").innerText = `Player ${turn} Turn`;
-  document.getElementById("callNumber").value = "";
+ location.href=`game.html?room=${room}&role=${role}&name=${encodeURIComponent(name)}`;
 }
 </script>
 
