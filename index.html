@@ -2,32 +2,198 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bingo Lobby</title>
+<title>Bingo Multiplayer</title>
+
 <style>
-body{font-family:Arial;text-align:center;padding:20px}
-input,button{font-size:18px;padding:8px;margin:5px}
+body { font-family: Arial; text-align:center; padding:10px; background:#f5f5f5; }
+.grid { display:grid; grid-template-columns:repeat(5,60px); gap:5px; justify-content:center; margin:10px; }
+.cell { width:60px;height:60px;line-height:60px;border:1px solid #333;background:#eee;font-size:18px; }
+.calledA{ background:#2196f3;color:white;}
+.calledB{ background:#4caf50;color:white;}
+.win{ background:gold !important;color:black;font-weight:bold;}
+
+input,button{ padding:8px;margin:5px;font-size:16px;}
+#chatBox{height:120px;overflow:auto;border:1px solid #ccc;background:white;margin:5px;padding:5px;}
+#fireworks{display:none;font-size:40px;}
 </style>
 </head>
 
 <body>
 
-<h2>🎯 Bingo Lobby</h2>
+<h2>🎯 Bingo Multiplayer</h2>
 
-<input id="name" placeholder="Your name"><br>
-<input id="room" placeholder="Room code (e.g. AB12)"><br>
+<div id="setup">
+Room: <input id="room" placeholder="room name"><br>
+Name: <input id="name" placeholder="your name"><br>
+<button onclick="join()">Join Game</button>
+</div>
 
-<button onclick="join('A')">Join as Player A</button>
-<button onclick="join('B')">Join as Player B</button>
+<div id="game" style="display:none">
 
-<script>
-function join(role){
- let name=document.getElementById("name").value;
- let room=document.getElementById("room").value;
+<h3 id="player"></h3>
+<div id="turn"></div>
+<h2 id="bingo"></h2>
 
- if(!name||!room) return alert("Enter name + room");
+<div class="grid" id="board"></div>
 
- location.href=`game.html?room=${room}&role=${role}&name=${encodeURIComponent(name)}`;
+<input id="num" type="number" min="1" max="25">
+<button onclick="call()">Call</button>
+<button onclick="reset()">Reset</button>
+
+<h3>Numbers:</h3>
+<div id="log"></div>
+
+<h3>Chat</h3>
+<div id="chatBox"></div>
+<input id="msg">
+<button onclick="send()">Send</button>
+
+<div id="fireworks">🎆🎆🎆 WIN 🎆🎆🎆</div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const config={
+  apiKey: "AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
+  authDomain: "bingo-sgthegreat.firebaseapp.com",
+  databaseURL: "https://bingo-sgthegreat-default-rtdb.firebaseio.com",
+  projectId: "bingo-sgthegreat",
+  storageBucket: "bingo-sgthegreat.firebasestorage.app",
+  messagingSenderId: "585612677716",
+  appId: "1:585612677716:web:e86d20262ecbdef5e4d3c1",
+  measurementId: "G-ZSH9785HVL"
+};
+
+const app=initializeApp(config);
+const db=getDatabase(app);
+
+let ROOM,ROLE,name;
+let grid=[],called={},completed=new Set();
+
+const lines=[
+[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],
+[15,16,17,18,19],[20,21,22,23,24],
+[0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],
+[3,8,13,18,23],[4,9,14,19,24],
+[0,6,12,18,24],[4,8,12,16,20]
+];
+
+const colors=["#ff5252","#ff9800","#ffeb3b","#00e676","#40c4ff"];
+
+window.join=function(){
+ROOM=document.getElementById("room").value;
+name=document.getElementById("name").value;
+if(!ROOM||!name)return;
+
+const roleRef=ref(db,ROOM+"/players");
+onValue(roleRef,snap=>{
+let p=snap.val()||{};
+if(!p.A){ ROLE="A"; set(ref(db,ROOM+"/players/A"),name); }
+else if(!p.B){ ROLE="B"; set(ref(db,ROOM+"/players/B"),name); }
+});
+
+start();
+};
+
+function start(){
+document.getElementById("setup").style.display="none";
+document.getElementById("game").style.display="block";
+
+document.getElementById("player").innerText=name+" ("+ROLE+")";
+
+let nums=[...Array(25).keys()].map(x=>x+1).sort(()=>Math.random()-0.5);
+grid=nums;
+const board=document.getElementById("board");
+board.innerHTML="";
+nums.forEach(n=>{
+let d=document.createElement("div");
+d.className="cell";
+d.id="c"+n;
+d.innerText=n;
+board.appendChild(d);
+});
+
+listen();
 }
+
+function listen(){
+onValue(ref(db,ROOM+"/turn"),s=>{
+let t=s.val()||"A";
+document.getElementById("turn").innerText=(t===ROLE)?"✅ Your turn":"⏳ Wait turn";
+});
+
+onValue(ref(db,ROOM+"/calls"),s=>{
+let data=s.val()||{};
+called={};
+document.getElementById("log").innerText="";
+Object.values(data).forEach(n=>{
+called[n]=true;
+document.getElementById("log").innerText+=n+" ";
+paint();
+check();
+});
+});
+
+onValue(ref(db,ROOM+"/chat"),s=>{
+let data=s.val()||{};
+let box=document.getElementById("chatBox");
+box.innerHTML="";
+Object.values(data).forEach(m=>{
+box.innerHTML+="<div>"+m+"</div>";
+});
+box.scrollTop=9999;
+});
+
+onValue(ref(db,ROOM+"/win"),s=>{
+if(s.val()){
+document.getElementById("fireworks").style.display="block";
+}
+});
+}
+
+window.call=function(){
+onValue(ref(db,ROOM+"/turn"),s=>{
+if(s.val()!==ROLE)return;
+let n=document.getElementById("num").value;
+if(!n||called[n])return;
+push(ref(db,ROOM+"/calls"),n);
+set(ref(db,ROOM+"/turn"),ROLE==="A"?"B":"A");
+});
+};
+
+function paint(){
+grid.forEach(n=>{
+let c=document.getElementById("c"+n);
+if(called[n])c.className="cell "+(ROLE==="A"?"calledA":"calledB");
+});
+}
+
+function check(){
+lines.forEach((line,i)=>{
+if(line.every(idx=>called[grid[idx]])&&!completed.has(i)){
+completed.add(i);
+line.forEach(idx=>{
+document.getElementById("c"+grid[idx]).style.background=colors[completed.size-1];
+});
+}
+});
+document.getElementById("bingo").innerText="BINGO".slice(0,completed.size);
+if(completed.size>=5)set(ref(db,ROOM+"/win"),ROLE);
+}
+
+window.send=function(){
+let m=document.getElementById("msg").value;
+push(ref(db,ROOM+"/chat"),name+": "+m);
+document.getElementById("msg").value="";
+};
+
+window.reset=function(){
+remove(ref(db,ROOM));
+location.reload();
+};
 </script>
 
 </body>
