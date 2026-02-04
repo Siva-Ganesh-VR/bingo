@@ -2,14 +2,34 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bingo - Player A</title>
-<link rel="manifest" href="manifest.json">
+<title>Player A</title>
 
 <style>
 body { font-family: Arial; text-align:center; padding:20px; }
-input, button { font-size:20px; padding:10px; margin:5px; width:120px; }
-#log { margin-top:20px; font-size:22px; word-wrap:break-word; }
-#turn { font-size:22px; font-weight:bold; margin-top:10px; }
+
+.grid {
+  display:grid;
+  grid-template-columns: repeat(5, 60px);
+  gap:5px;
+  justify-content:center;
+  margin:20px auto;
+}
+
+.cell {
+  width:60px;
+  height:60px;
+  line-height:60px;
+  border:1px solid #000;
+  font-size:20px;
+}
+
+.marked {
+  background:black;
+  color:white;
+}
+
+input, button { font-size:18px; padding:8px; margin:5px; }
+#turn { font-weight:bold; font-size:20px; }
 </style>
 </head>
 
@@ -17,6 +37,8 @@ input, button { font-size:20px; padding:10px; margin:5px; width:120px; }
 
 <h2>🎯 Player A</h2>
 <div id="turn">Loading...</div>
+
+<div class="grid" id="board"></div>
 
 <input id="num" type="number" min="1" max="25" placeholder="1-25">
 <button onclick="call()">Call</button>
@@ -35,8 +57,7 @@ const firebaseConfig = {
   projectId: "bingo-sgthegreat",
   storageBucket: "bingo-sgthegreat.firebasestorage.app",
   messagingSenderId: "585612677716",
-  appId: "1:585612677716:web:e86d20262ecbdef5e4d3c1",
-  measurementId: "G-ZSH9785HVL"
+  appId: "1:585612677716:web:e86d20262ecbdef5e4d3c1"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -45,33 +66,46 @@ const db = getDatabase(app);
 const turnRef = ref(db, "turn");
 const callsRef = ref(db, "calls");
 
-// set first turn as A (only first time)
 set(turnRef, "A");
 
 let currentTurn = "";
 
-onValue(turnRef, snap => {
-  currentTurn = snap.val();
-  document.getElementById("turn").innerText =
-    currentTurn === "A" ? "✅ Your Turn" : "⏳ Player B Turn";
+// ===== generate random board =====
+let nums = Array.from({length:25}, (_,i)=>i+1)
+  .sort(()=>Math.random()-0.5);
+
+const board = document.getElementById("board");
+nums.forEach(n=>{
+  let d = document.createElement("div");
+  d.className="cell";
+  d.id="c"+n;
+  d.innerText=n;
+  board.appendChild(d);
 });
 
-window.call = function(){
-  if(currentTurn !== "A") {
-    alert("Wait for your turn!");
-    return;
-  }
+// ===== turn watcher =====
+onValue(turnRef, snap=>{
+  currentTurn = snap.val();
+  document.getElementById("turn").innerText =
+    currentTurn==="A" ? "✅ Your Turn" : "⏳ Player B Turn";
+});
 
-  let n = document.getElementById("num").value;
+// ===== call number =====
+window.call=function(){
+  if(currentTurn!=="A") return alert("Wait for your turn!");
+  let n=document.getElementById("num").value;
   if(!n) return;
-
-  push(callsRef, n);
-  set(turnRef, "B");
+  push(callsRef,n);
+  set(turnRef,"B");
   document.getElementById("num").value="";
 }
 
+// ===== sync marking =====
 onChildAdded(callsRef, snap=>{
-  document.getElementById("log").innerText += " " + snap.val();
+  let n=snap.val();
+  document.getElementById("log").innerText += " "+n;
+  let cell=document.getElementById("c"+n);
+  if(cell) cell.classList.add("marked");
 });
 </script>
 
