@@ -9,7 +9,7 @@ body { font-family: Arial; text-align:center; padding:20px; }
 
 .grid {
   display:grid;
-  grid-template-columns: repeat(5, 60px);
+  grid-template-columns:repeat(5,60px);
   gap:5px;
   justify-content:center;
   margin:20px auto;
@@ -24,40 +24,36 @@ body { font-family: Arial; text-align:center; padding:20px; }
 }
 
 .marked { background:black; color:white; }
+.win { background:lime !important; color:black; }
 
-input, button { font-size:18px; padding:8px; margin:5px; }
-#turn { font-weight:bold; font-size:20px; }
+#bingo { font-size:32px; font-weight:bold; letter-spacing:8px; }
 
-#winner {
-  font-size:24px;
-  color:red;
-  font-weight:bold;
-  margin-top:15px;
-}
+#winner { font-size:22px; color:red; margin:10px; }
 
-.fireworks {
+.fire {
   position:fixed;
   inset:0;
-  pointer-events:none;
-  background: radial-gradient(circle, #fff 2px, transparent 3px);
-  animation: boom 1s infinite;
+  background:radial-gradient(circle,#fff 2px,transparent 3px);
+  animation:boom 1s infinite;
   opacity:.6;
   display:none;
+  pointer-events:none;
 }
 
 @keyframes boom {
-  from { transform:scale(0); }
-  to { transform:scale(4); opacity:0; }
+  from{transform:scale(0);}
+  to{transform:scale(4);opacity:0;}
 }
 </style>
 </head>
 
 <body>
 
-<div class="fireworks" id="fx"></div>
+<div class="fire" id="fx"></div>
 
 <h2>🎯 Player A</h2>
 <div id="turn"></div>
+<div id="bingo"></div>
 <div id="winner"></div>
 
 <div class="grid" id="board"></div>
@@ -73,15 +69,15 @@ input, button { font-size:18px; padding:8px; margin:5px; }
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, push, set, remove, onValue, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-const config = {
+const config={
  apiKey:"AIzaSyCdcOpVzbZwKkbiSTHfsbYIecRuDbq9uns",
  authDomain:"bingo-sgthegreat.firebaseapp.com",
  databaseURL:"https://bingo-sgthegreat-default-rtdb.firebaseio.com",
  projectId:"bingo-sgthegreat"
 };
 
-const app = initializeApp(config);
-const db = getDatabase(app);
+const app=initializeApp(config);
+const db=getDatabase(app);
 
 const turnRef=ref(db,"turn");
 const callsRef=ref(db,"calls");
@@ -90,11 +86,8 @@ const winRef=ref(db,"winner");
 
 set(turnRef,"A");
 
-let called={};
-let myNums=[];
-let gameOver=false;
+let called={}, myNums=[], gameOver=false;
 
-// board
 myNums=Array.from({length:25},(_,i)=>i+1).sort(()=>Math.random()-0.5);
 myNums.forEach(n=>{
  let d=document.createElement("div");
@@ -112,43 +105,54 @@ onValue(winRef,s=>{
  gameOver=true;
  fx.style.display="block";
  winner.innerText = s.val()==="A"
-   ? "🎉 YOU WIN!"
-   : "You never win sg";
+  ? "🎉 YOU WIN!"
+  : "You never win sg";
 });
 
-function countLines(){
- let grid=myNums.map(n=>called[n]?1:0);
+function checkLines(){
+ let g=myNums.map(n=>called[n]?1:0);
  let lines=0;
+ document.querySelectorAll(".cell").forEach(c=>c.classList.remove("win"));
 
- for(let r=0;r<5;r++)
-  if(grid.slice(r*5,r*5+5).every(x=>x)) lines++;
+ const winLines=[];
 
- for(let c=0;c<5;c++){
-  let ok=true;
-  for(let r=0;r<5;r++) if(!grid[r*5+c]) ok=false;
-  if(ok) lines++;
+ for(let r=0;r<5;r++){
+  let idx=[r*5,r*5+1,r*5+2,r*5+3,r*5+4];
+  if(idx.every(i=>g[i])){lines++;winLines.push(idx);}
  }
 
- if([0,6,12,18,24].every(i=>grid[i])) lines++;
- if([4,8,12,16,20].every(i=>grid[i])) lines++;
+ for(let c=0;c<5;c++){
+  let idx=[c,c+5,c+10,c+15,c+20];
+  if(idx.every(i=>g[i])){lines++;winLines.push(idx);}
+ }
 
+ let d1=[0,6,12,18,24];
+ let d2=[4,8,12,16,20];
+ if(d1.every(i=>g[i])){lines++;winLines.push(d1);}
+ if(d2.every(i=>g[i])){lines++;winLines.push(d2);}
+
+ winLines.flat().forEach(i=>{
+  let n=myNums[i];
+  document.getElementById("c"+n)?.classList.add("win");
+ });
+
+ bingo.innerText="BINGO".slice(0,lines);
  return lines;
 }
 
 window.call=async function(){
  if(gameOver) return;
- let turnNow;
- onValue(turnRef,s=>turnNow=s.val(),{onlyOnce:true});
- if(turnNow!=="A") return alert("Wait turn");
+ let t; onValue(turnRef,s=>t=s.val(),{onlyOnce:true});
+ if(t!=="A") return alert("Wait turn");
 
  let n=num.value;
- if(!n || called[n]) return alert("Invalid");
+ if(!n||called[n]) return alert("Invalid");
 
  await set(ref(db,"called/"+n),true);
  push(callsRef,n);
  set(turnRef,"B");
 
- if(countLines()>=5) set(winRef,"A");
+ if(checkLines()>=5) set(winRef,"A");
 
  num.value="";
 };
@@ -162,10 +166,12 @@ window.resetGame=function(){
 };
 
 onChildAdded(callsRef,s=>{
+ if(gameOver) return;
  let n=s.val();
  log.innerText+=" "+n;
- let c=document.getElementById("c"+n);
- if(c) c.classList.add("marked");
+ document.getElementById("c"+n)?.classList.add("marked");
+
+ if(checkLines()>=5) set(winRef,"A");
 });
 </script>
 
